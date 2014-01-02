@@ -168,12 +168,18 @@ else
 end
 
 if node['rabbitmq']['cluster'] && (node['rabbitmq']['erlang_cookie'] != existing_erlang_key)
+  ruby_block "stop rabbitmq before change erlang_cookie" do
+    block do
+      #Chef::Config.from_file("/etc/chef/client.rb")
+    end
+    notifies :stop, "service[#{node['rabbitmq']['service_name']}]", :immediately
+  end
+
   template node['rabbitmq']['erlang_cookie_path'] do
     source 'doterlang.cookie.erb'
     owner 'rabbitmq'
     group 'rabbitmq'
     mode 00400
-    notifies :stop, "service[#{node['rabbitmq']['service_name']}]", :immediately
     notifies :start, "service[#{node['rabbitmq']['service_name']}]", :immediately
     notifies :run, "execute[reset-node]", :immediately
   end
