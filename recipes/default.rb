@@ -176,7 +176,7 @@ if node['rabbitmq']['cluster'] && (node['rabbitmq']['erlang_cookie'] != existing
   end
 
   bash "I said stop it" do
-    code "killall beam"
+    code "killall beam && killall epmd"
     user 'root'
   end
 
