@@ -175,6 +175,11 @@ if node['rabbitmq']['cluster'] && (node['rabbitmq']['erlang_cookie'] != existing
     notifies :stop, "service[#{node['rabbitmq']['service_name']}]", :immediately
   end
 
+  bash "I said stop it" do
+    code "killall beam"
+    user 'root'
+  end
+
   template node['rabbitmq']['erlang_cookie_path'] do
     source 'doterlang.cookie.erb'
     owner 'rabbitmq'
