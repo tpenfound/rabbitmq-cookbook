@@ -175,8 +175,18 @@ if node['rabbitmq']['cluster'] && (node['rabbitmq']['erlang_cookie'] != existing
     notifies :stop, "service[#{node['rabbitmq']['service_name']}]", :immediately
   end
 
-  bash "I said stop it" do
-    code "killall beam && killall epmd"
+  # bash "I said stop it" do
+  #   code "killall beam && killall epmd"
+  #   user 'root'
+  # end
+
+  bash "wait until stop" do
+    code <<-EOH
+      /etc/init.d/rabbitmq-server stop
+      killall epmd
+      killall beam
+      while sudo fuser /var/log/rabbitmq/* ; do echo "`date` Waiting for rabbits to die";  sleep 5; done
+    EOH
     user 'root'
   end
 
