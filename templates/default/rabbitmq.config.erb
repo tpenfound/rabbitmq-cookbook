@@ -16,7 +16,7 @@
   ]},
 <% end %>
   {rabbit, [
-<% if node['rabbitmq']['cluster'] && node['rabbitmq']['cluster_disk_nodes'] -%>
+<% if node['rabbitmq']['cluster'] && node['rabbitmq']['cluster_disk_nodes'] && 1==2 -%>
     {cluster_nodes, [<%= node['rabbitmq']['cluster_disk_nodes'].map{|n| "\'#{n}\'"}.join(',') %>]},
 <% end %>
 <% if node['rabbitmq']['ssl'] -%>
@@ -41,6 +41,12 @@
 <% end %>
 <% if node['rabbitmq']['version'] >= '3.3.0' -%>
     {loopback_users, []},
+<% end %>
+<% if node['rabbitmq']['cluster'] -%>
+  {cluster_nodes, {
+    [<%= @cluster_setup_line %>
+    ], disc}
+  },
 <% end %>
     {default_user, <<"<%= node['rabbitmq']['default_user'] %>">>},
     {default_pass, <<"<%= node['rabbitmq']['default_pass'] %>">>}

@@ -59,7 +59,7 @@ when 'debian'
       group 'root'
       mode 0644
       variables(:max_file_descriptors => node['rabbitmq']['max_file_descriptors'])
-      
+
     end
 
     service node['rabbitmq']['service_name'] do
@@ -154,8 +154,19 @@ template "#{node['rabbitmq']['config_root']}/rabbitmq-env.conf" do
   notifies :restart, "service[#{node['rabbitmq']['service_name']}]"
 end
 
+cluster_line=''
+if node['rabbitmq']['cluster']
+  rabbitmq_nodes = search(:node,"recipe:#{node['rabbitmq']['rabbitmq_role']} AND chef_environment:#{node.chef_environment}")
+  if rabbitmq_nodes.length>1 
+    cluster_line = rabbitmq_nodes.reject { |n| n.name == node.name }.collect { |n| "'rabbit@#{n.name}'" }.join(", ")
+  end   
+end
+
 template "#{node['rabbitmq']['config_root']}/rabbitmq.config" do
   source 'rabbitmq.config.erb'
+  variables({
+    :cluster_setup_line => cluster_line
+   })
   owner 'root'
   group 'root'
   mode 00644
@@ -178,7 +189,7 @@ if node['rabbitmq']['cluster'] && (node['rabbitmq']['erlang_cookie'] != existing
 
   bash "wait until stop" do
     code <<-EOH
-      setsid /etc/init.d/rabbitmq-server stop
+      setsid service rabbitmq-server stop
       killall epmd
       killall beam
       while sudo fuser #{node['rabbitmq']['logdir']}/* ; do echo "`date` Waiting for rabbits to die";  sleep 5; done
@@ -192,58 +203,5 @@ if node['rabbitmq']['cluster'] && (node['rabbitmq']['erlang_cookie'] != existing
     group 'rabbitmq'
     mode 00400
     notifies :start, "service[#{node['rabbitmq']['service_name']}]", :immediately
-  end
-end
-
-if node['rabbitmq']['cluster'] and (!File.exists?('/var/lib/rabbitmq/.cluster_setup'))
-  if (!File.exists?('/var/lib/rabbitmq/.is_first_run'))
-    bash "touch first is_first_run" do
-      user "root"
-      code <<-EOH
-        touch /var/lib/rabbitmq/.is_first_run
-      EOH
-    end
-  
-  else
-
-    rabbitmq_nodes = search(:node,"recipe:#{node['rabbitmq']['rabbitmq_role']} AND chef_environment:#{node.chef_environment}")
-    #other_cluster_nodes = rabbitmq_nodes.reject { |n| n.name == node.name }.collect { |n| "'rabbit@#{n.name}'" }[0].join(" ")
-    other_cluster_nodes=rabbitmq_nodes.reject { |n| n.name == node.name }.collect { |n| "'rabbit@#{n.name}'" }[0]
-
-    template "/var/lib/rabbitmq/make_cluster.sh" do
-      source 'make_cluster.erb'
-      owner 'rabbitmq'
-      group 'rabbitmq'
-      variables({
-        :cluster_setup_line => other_cluster_nodes
-        })
-      mode 00400
-      notifies :run, "execute[make-cluster]", :immediately
-    end
-
-    execute "make-cluster" do
-      command "/bin/bash /var/lib/rabbitmq/make_cluster.sh"
-      user 'root'
-      action :run
-    end
-
-  #leftover code: hypothetically, we should be able to run the cluster initialization from a bash block instead of 
-
-  #   rabbitmq_nodes = search(:node,"recipe:#{node['rabbitmq']['rabbitmq_role']} AND chef_environment:#{node.chef_environment}")
-  #   other_cluster_nodes = rabbitmq_nodes.reject { |n| n.name == node.name }.collect { |n| "'rabbit@#{n.name}'" }.join(" ")
-   
-  #   if rabbitmq_nodes.length>1
-  #     bash "make cluster happen" do
-  #       user "root"
-  #       code <<-EOH
-  #         setsid rabbitmqctl stop_app 
-  #         setsid rabbitmqctl join_cluster #{other_cluster_nodes}
-  #         setsid rabbitmqctl start_app
-  #         touch /var/lib/rabbitmq/.cluster_setup
-  #         rm /var/lib/rabbitmq/.is_first_run
-  #         setsid rabbitmqctl cluster_status
-  #       EOH
-  #     end
-  #   end
   end
 end
