@@ -1,0 +1,8 @@
+#!/bin/bash
+
+setsid rabbitmqctl stop_app 
+setsid rabbitmqctl join_cluster <%= @cluster_setup_line %>
+setsid rabbitmqctl start_app
+touch /var/lib/rabbitmq/.cluster_setup
+rm /var/lib/rabbitmq/.is_first_run
+setsid rabbitmqctl cluster_status
