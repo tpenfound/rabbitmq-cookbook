@@ -47,6 +47,7 @@ when 'debian'
 
     execute 'remove rabbitmq init.d command' do
       command 'update-rc.d -f rabbitmq-server remove'
+      only_if { File.exists?('/etc/init.d/rabbitmq-server') }
     end
 
     file '/etc/init.d/rabbitmq-server' do
@@ -256,5 +257,70 @@ if node['rabbitmq']['cluster'] and (!File.exists?('/var/lib/rabbitmq/.cluster_se
   #       EOH
   #     end
   #   end
+  end
+end
+
+#move data and log dirs to the ephemeral drive, symlink them to the original locations
+unless File.exists?('/var/lib/rabbitmq/.custom_directories_set')
+  
+  execute "rabbitmq-stop" do
+    command "setsid service rabbitmq-server stop"
+    action :run
+  end
+  
+  if node['rabbitmq']['mnesiadir'] != '/var/lib/rabbitmq'
+    directory node['rabbitmq']['mnesiadir'] do
+      mode "0775"
+      owner "rabbitmq"
+      group "rabbitmq"
+      action :create
+      recursive true
+    end
+    
+    bash "move-data-dir" do
+      user "root"
+      code <<-EOH
+      mv /var/lib/rabbitmq/* #{node['rabbitmq']['mnesiadir']}
+      rm -rf /var/lib/rabbitmq/
+      EOH
+    end
+  
+    link "/var/lib/rabbitmq" do
+      to node['rabbitmq']['mnesiadir']
+    end 
+  end
+  
+  if node['rabbitmq']['logdir'] != '/var/log/rabbitmq'
+    
+    directory node['rabbitmq']['logdir'] do
+      mode "0775"
+      owner "rabbitmq"
+      group "rabbitmq"
+      action :create
+      recursive true
+    end
+        
+    bash "move-log-dir" do
+      user "root"
+      code <<-EOH
+      mv /var/log/rabbitmq #{node['rabbitmq']['logdir']}
+      EOH
+    end
+
+    link "/var/log/rabbitmq" do
+      to node['rabbitmq']['logdir']
+    end
+  end
+
+  execute "rabbitmq-start" do
+    command "setsid service rabbitmq-server start"
+    action :run
+  end
+
+  bash "make-directory-changes-one-time-idempotent" do
+    user "root"
+    code <<-EOH
+    touch /var/lib/rabbitmq/.custom_directories_set
+    EOH
   end
 end
