@@ -43,7 +43,7 @@ default['rabbitmq']['max_file_descriptors'] = 1024
 default['rabbitmq']['open_file_limit'] = nil
 
 # job control
-default['rabbitmq']['job_control'] = 'initd'
+default['rabbitmq']['job_control'] = 'upstart'
 
 #ssl
 default['rabbitmq']['ssl'] = false
